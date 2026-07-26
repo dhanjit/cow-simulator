@@ -89,15 +89,17 @@ scripts/
 
 Presets are committed in `export_presets.cfg`. Export templates are a separate
 ~1.2 GB download (**Editor → Manage Export Templates**), and the target directory
-must exist before you export:
+must exist before you export — Godot will not create it:
 
 ```powershell
-New-Item -ItemType Directory -Force build\windows
+New-Item -ItemType Directory -Force build\windows, build\linux
 godot --headless --path . --export-release "Windows Desktop" build/windows/cow-simulator.exe
+godot --headless --path . --export-release "Linux" build/linux/cow-simulator.x86_64
 ```
 
-> Not yet verified on this machine — export templates are not installed. Everything
-> else in this README has been run.
+`--export-release` matches the preset **`name`**, not its `platform`. Both presets
+have been exported and the resulting Windows binary launched standalone
+(104 MB exe + a 0.1 MB pck — the world is generated, not stored).
 
 ## Notes for future me
 
@@ -115,3 +117,11 @@ Two bugs cost most of the debugging time on day one, both worth remembering:
 A double-sided terrain material also writes the ground's underside into the shadow
 map, which shadows the lit surface and flattens the whole world. Keep the terrain
 single-sided and keep the camera above ground instead.
+
+And a Windows-specific one: **never edit a `.tscn` with PowerShell's
+`Set-Content -Encoding utf8`.** Windows PowerShell 5.1 writes a UTF-8 BOM, and the
+three BOM bytes sit in front of `[gd_scene`, which produces
+`Parse Error: Expected '['` at export time. The editor and `--write-movie` runs
+tolerated it silently, so it only surfaced during the first real export. Use
+`[System.IO.File]::WriteAllText` with a `UTF8Encoding($false)`, or just edit the
+file directly.
