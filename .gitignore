@@ -1,0 +1,34 @@
+# Godot 4 editor cache / imported asset cache
+.godot/
+.import/
+
+# Legacy Godot 3 leftovers
+export.cfg
+*.translation
+.mono/
+data_*/
+mono_crash.*.json
+
+# Build output
+build/
+exports/
+*.pck
+*.exe
+*.x86_64
+*.zip
+
+# Steamworks SDK (download separately, do not vendor - it is not redistributable)
+steamworks_sdk/
+sdk/
+steamcmd/
+
+# OS / editor noise
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+
+# NOTE: export_presets.cfg IS committed on purpose so builds are reproducible.
+# If a preset ever gains a signing password or keystore path, move it to an
+# untracked override before committing.

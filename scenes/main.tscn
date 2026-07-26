@@ -1,0 +1,71 @@
+﻿[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="Script" path="res://scripts/mountain_terrain.gd" id="2_terrain"]
+[ext_resource type="Script" path="res://scripts/grass_field.gd" id="3_grass"]
+[ext_resource type="Script" path="res://scripts/camera_rig.gd" id="4_rig"]
+[ext_resource type="PackedScene" path="res://scenes/cow.tscn" id="5_cow"]
+[ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="6_hud"]
+
+[sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
+sky_top_color = Color(0.278431, 0.427451, 0.729412, 1)
+sky_horizon_color = Color(0.741176, 0.815686, 0.886275, 1)
+sky_curve = 0.12
+ground_bottom_color = Color(0.176471, 0.196078, 0.219608, 1)
+ground_horizon_color = Color(0.741176, 0.815686, 0.886275, 1)
+sun_angle_max = 26.0
+sun_curve = 0.12
+
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("sky_mat")
+
+[sub_resource type="Environment" id="env"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 3
+ambient_light_energy = 0.28
+tonemap_mode = 2
+tonemap_white = 2.0
+fog_enabled = true
+fog_light_color = Color(0.678431, 0.760784, 0.847059, 1)
+fog_light_energy = 1.0
+fog_density = 0.0016
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_game")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.8192, 0.4394, -0.3687, 0, 0.6428, 0.766, 0.5736, -0.6275, 0.5266, 0, 60, 0)
+light_color = Color(1, 0.960784, 0.882353, 1)
+light_energy = 0.95
+shadow_enabled = true
+shadow_bias = 0.06
+shadow_normal_bias = 2.5
+directional_shadow_max_distance = 100.0
+
+[node name="Terrain" type="StaticBody3D" parent="."]
+script = ExtResource("2_terrain")
+
+[node name="Mesh" type="MeshInstance3D" parent="Terrain"]
+
+[node name="Collision" type="CollisionShape3D" parent="Terrain"]
+
+[node name="Grass" type="MultiMeshInstance3D" parent="."]
+script = ExtResource("3_grass")
+
+[node name="Cow" parent="." instance=ExtResource("5_cow")]
+
+[node name="CameraRig" type="Node3D" parent="."]
+script = ExtResource("4_rig")
+distance = 6.5
+height_offset = 1.3
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+fov = 70.0
+near = 0.1
+far = 900.0
+
+[node name="Hud" parent="." instance=ExtResource("6_hud")]

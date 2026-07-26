@@ -1,0 +1,10 @@
+# Godot text resources are LF everywhere. This machine has core.autocrlf=false
+# set user-globally, so these will not be rewritten on checkout.
+*.gd      text eol=lf
+*.tscn    text eol=lf
+*.tres    text eol=lf
+*.godot   text eol=lf
+*.cfg     text eol=lf
+*.md      text eol=lf
+*.svg     text eol=lf
+*.vdf     text eol=lf
