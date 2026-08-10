@@ -1,103 +1,17 @@
-[gd_scene load_steps=22 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/cow.gd" id="1_cow"]
+[ext_resource type="Script" path="res://scripts/cow_model.gd" id="2_model"]
 
-[sub_resource type="StandardMaterial3D" id="mat_hide"]
-albedo_color = Color(0.941176, 0.921569, 0.87451, 1)
-roughness = 0.85
-
-[sub_resource type="StandardMaterial3D" id="mat_spot"]
-albedo_color = Color(0.192157, 0.152941, 0.129412, 1)
-roughness = 0.85
-
-[sub_resource type="StandardMaterial3D" id="mat_pink"]
-albedo_color = Color(0.898039, 0.619608, 0.615686, 1)
-roughness = 0.7
-
-[sub_resource type="StandardMaterial3D" id="mat_hoof"]
-albedo_color = Color(0.196078, 0.176471, 0.164706, 1)
-roughness = 0.6
-
-[sub_resource type="StandardMaterial3D" id="mat_horn"]
-albedo_color = Color(0.815686, 0.780392, 0.658824, 1)
-roughness = 0.55
+[sub_resource type="CapsuleShape3D" id="shape_body"]
+radius = 0.5
+height = 1.6
 
 [sub_resource type="StandardMaterial3D" id="mat_ring"]
 transparency = 1
 shading_mode = 0
 albedo_color = Color(1, 1, 1, 0.45)
 cull_mode = 2
-
-[sub_resource type="CapsuleShape3D" id="shape_body"]
-radius = 0.5
-height = 1.6
-
-[sub_resource type="BoxMesh" id="box_body"]
-material = SubResource("mat_hide")
-size = Vector3(0.86, 0.84, 1.9)
-
-[sub_resource type="BoxMesh" id="box_head"]
-material = SubResource("mat_hide")
-size = Vector3(0.5, 0.5, 0.62)
-
-[sub_resource type="BoxMesh" id="box_snout"]
-material = SubResource("mat_pink")
-size = Vector3(0.36, 0.3, 0.24)
-
-[sub_resource type="BoxMesh" id="box_ear"]
-material = SubResource("mat_hide")
-size = Vector3(0.24, 0.08, 0.15)
-
-[sub_resource type="BoxMesh" id="box_spot_a"]
-material = SubResource("mat_spot")
-size = Vector3(0.06, 0.36, 0.52)
-
-[sub_resource type="BoxMesh" id="box_spot_b"]
-material = SubResource("mat_spot")
-size = Vector3(0.06, 0.26, 0.34)
-
-[sub_resource type="BoxMesh" id="box_spot_c"]
-material = SubResource("mat_spot")
-size = Vector3(0.34, 0.06, 0.44)
-
-[sub_resource type="CylinderMesh" id="cyl_leg"]
-material = SubResource("mat_hide")
-top_radius = 0.11
-bottom_radius = 0.1
-height = 0.72
-radial_segments = 10
-rings = 1
-
-[sub_resource type="CylinderMesh" id="cyl_hoof"]
-material = SubResource("mat_hoof")
-top_radius = 0.13
-bottom_radius = 0.12
-height = 0.14
-radial_segments = 10
-rings = 1
-
-[sub_resource type="CylinderMesh" id="cyl_horn"]
-material = SubResource("mat_horn")
-top_radius = 0.02
-bottom_radius = 0.055
-height = 0.22
-radial_segments = 8
-rings = 1
-
-[sub_resource type="CylinderMesh" id="cyl_tail"]
-material = SubResource("mat_hide")
-top_radius = 0.045
-bottom_radius = 0.03
-height = 0.7
-radial_segments = 8
-rings = 1
-
-[sub_resource type="SphereMesh" id="sphere_udder"]
-material = SubResource("mat_pink")
-radius = 0.22
-height = 0.36
-radial_segments = 12
-rings = 6
 
 [sub_resource type="TorusMesh" id="torus_ring"]
 material = SubResource("mat_ring")
@@ -118,109 +32,18 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 shape = SubResource("shape_body")
 
 [node name="Model" type="Node3D" parent="."]
-
-[node name="Body" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.16, 0)
-mesh = SubResource("box_body")
-
-[node name="SpotL1" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 0.9781, -0.2079, 0, 0.2079, 0.9781, -0.445, 1.26, -0.3)
-mesh = SubResource("box_spot_a")
-
-[node name="SpotL2" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 0.9455, 0.3256, 0, -0.3256, 0.9455, -0.445, 1.08, 0.42)
-mesh = SubResource("box_spot_b")
-
-[node name="SpotR1" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 0.9563, 0.2924, 0, -0.2924, 0.9563, 0.445, 1.2, 0.2)
-mesh = SubResource("box_spot_a")
-
-[node name="SpotR2" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 0.9781, -0.2079, 0, 0.2079, 0.9781, 0.445, 1.34, -0.45)
-mesh = SubResource("box_spot_b")
-
-[node name="SpotBack1" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(0.9903, 0, 0.1392, 0, 1, 0, -0.1392, 0, 0.9903, -0.13, 1.585, -0.22)
-mesh = SubResource("box_spot_c")
-
-[node name="SpotBack2" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(0.9781, 0, -0.2079, 0, 1, 0, 0.2079, 0, 0.9781, 0.16, 1.585, 0.4)
-mesh = SubResource("box_spot_c")
-
-[node name="Udder" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0.3)
-mesh = SubResource("sphere_udder")
-
-[node name="LegFL" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.4, -0.62)
-mesh = SubResource("cyl_leg")
-
-[node name="LegFR" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.4, -0.62)
-mesh = SubResource("cyl_leg")
-
-[node name="LegBL" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.4, 0.62)
-mesh = SubResource("cyl_leg")
-
-[node name="LegBR" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.4, 0.62)
-mesh = SubResource("cyl_leg")
-
-[node name="HoofFL" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.07, -0.62)
-mesh = SubResource("cyl_hoof")
-
-[node name="HoofFR" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.07, -0.62)
-mesh = SubResource("cyl_hoof")
-
-[node name="HoofBL" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.07, 0.62)
-mesh = SubResource("cyl_hoof")
-
-[node name="HoofBR" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.07, 0.62)
-mesh = SubResource("cyl_hoof")
-
-[node name="Tail" type="MeshInstance3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, -0.85689, -0.5155, 0, 0.5155, -0.85689, 0, 1.5, 0.92)
-mesh = SubResource("cyl_tail")
+script = ExtResource("2_model")
 
 [node name="Neck" type="Node3D" parent="Model"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, -0.82)
-
-[node name="Head" type="MeshInstance3D" parent="Model/Neck"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, -0.34)
-mesh = SubResource("box_head")
-
-[node name="Snout" type="MeshInstance3D" parent="Model/Neck"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, -0.73)
-mesh = SubResource("box_snout")
-
-[node name="EarL" type="MeshInstance3D" parent="Model/Neck"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3, 0.14, -0.22)
-mesh = SubResource("box_ear")
-
-[node name="EarR" type="MeshInstance3D" parent="Model/Neck"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0.14, -0.22)
-mesh = SubResource("box_ear")
-
-[node name="HornL" type="MeshInstance3D" parent="Model/Neck"]
-transform = Transform3D(0.81915, -0.57358, 0, 0.57358, 0.81915, 0, 0, 0, 1, -0.19, 0.28, -0.22)
-mesh = SubResource("cyl_horn")
-
-[node name="HornR" type="MeshInstance3D" parent="Model/Neck"]
-transform = Transform3D(0.81915, 0.57358, 0, -0.57358, 0.81915, 0, 0, 0, 1, 0.19, 0.28, -0.22)
-mesh = SubResource("cyl_horn")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, -0.66)
 
 [node name="MooPlayer" type="AudioStreamPlayer3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, -1.1)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, -1.4)
 unit_size = 14.0
 max_db = 0.0
 
 [node name="MooRing" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -1.3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, -1.7)
 visible = false
 cast_shadow = 0
 mesh = SubResource("torus_ring")

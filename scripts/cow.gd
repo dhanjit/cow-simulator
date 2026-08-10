@@ -45,9 +45,10 @@ func _ready() -> void:
 	fullness_changed.emit(fullness, max_fullness)
 
 
-## Where the mouth is: just in front of the model, at ground level.
+## Where the mouth is: under the muzzle, at ground level. Kept in sync with
+## how far the head reaches in cow_model.gd.
 func mouth_position() -> Vector3:
-	return global_position - _model.global_transform.basis.z * 1.05
+	return global_position - _model.global_transform.basis.z * 1.35
 
 
 ## True when standing still on grass - drives the HUD prompt.

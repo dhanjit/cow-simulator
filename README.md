@@ -51,6 +51,11 @@ camera is mouse-only for now.
   so none of them can disagree about where the ground is.
 - **Cow controller.** `CharacterBody3D` with weighty acceleration, slope handling up
   to 57°, camera-relative steering, and a hoof-bob/sway gait that scales with speed.
+- **The cow itself** is generated at runtime from lofted tubes — a path, a radius
+  per station, a swept ring — rather than assembled from box and cylinder
+  primitives. Markings are vertex colours evaluated against noise-warped blobs, so
+  they wrap the body instead of sitting on it as flat plates. Stylised is fine;
+  a crate on sticks is not.
 - **Grazing.** Hold `E` and the head drops. Individual tufts within reach are chewed
   shorter and disappear; the fullness meter fills by exactly what was consumed. A
   patch runs out in about a second, so the loop is *stop, eat, move on* rather than
@@ -73,13 +78,14 @@ on a mountain worth building?* — before any of that gets paid for.
 project.godot          input map, window and renderer config
 scenes/
   main.tscn            world root: environment, sun, terrain, grass, cow, camera, HUD
-  cow.tscn             the cow — primitive meshes, collision capsule, moo audio + ring
+  cow.tscn             the cow — collision capsule, neck pivot, moo audio + ring
   hud.tscn             fullness bar, graze prompt, control hints
 scripts/
   game.gd              owns build order: terrain -> grass -> cow -> camera
   mountain_terrain.gd  height function, mesh + collider generation, spawn search
   grass_field.gd       MultiMesh tufts, spatial-hash grazing queries, regrowth
   cow.gd               movement, grazing, fullness, moo
+  cow_model.gd         builds the cow mesh from lofted tubes at runtime
   camera_rig.gd        third-person orbit, raycast + heightfield collision
   hud.gd               HUD bindings
   moo_synth.gd         procedural moo generator
