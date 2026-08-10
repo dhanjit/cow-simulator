@@ -32,6 +32,7 @@ var camera: Camera3D
 var _moo_cooldown: float = 0.0
 var _moo_pose: float = 0.0
 var _stride: float = 0.0
+var _neck_rest: Vector3 = Vector3.ZERO
 
 @onready var _model: Node3D = $Model
 @onready var _neck: Node3D = $Model/Neck
@@ -40,6 +41,7 @@ var _stride: float = 0.0
 
 
 func _ready() -> void:
+	_neck_rest = _neck.position
 	fullness = clampf(start_fullness, 0.0, max_fullness)
 	_moo_ring.visible = false
 	fullness_changed.emit(fullness, max_fullness)
@@ -137,10 +139,18 @@ func _update_pose(delta: float, planar: Vector3) -> void:
 	# Negative X rotation swings the head down toward the ground.
 	var target_pitch := 0.0
 	if is_grazing:
-		target_pitch = deg_to_rad(-52.0)
+		target_pitch = deg_to_rad(-72.0)
 	elif _moo_pose > 0.0:
 		target_pitch = deg_to_rad(22.0)
 	_neck.rotation.x = lerpf(_neck.rotation.x, target_pitch, 1.0 - exp(-11.0 * delta))
+
+	# Rotation alone is not enough to reach the grass: the neck pivots at the
+	# shoulder, and pivot height minus neck length still leaves the muzzle in
+	# mid air. A real cow drops its shoulders too, so lower the pivot as well.
+	var target_neck := _neck_rest
+	if is_grazing:
+		target_neck += Vector3(0.0, -0.30, -0.10)
+	_neck.position = _neck.position.lerp(target_neck, 1.0 - exp(-11.0 * delta))
 
 
 func _moo() -> void:

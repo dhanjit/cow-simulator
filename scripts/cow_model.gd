@@ -28,14 +28,27 @@ const HORN := Color(0.85, 0.79, 0.66)
 const EYE := Color(0.05, 0.04, 0.04)
 const GLINT := Color(1.0, 1.0, 1.0)
 
+## Proportions are keyed to a real Holstein, scaled so the withers land at
+## 1.50 and the belly at 0.76 (metres, hooves at y = 0):
+##
+##   width / withers height   0.41   - a cow is NARROW; this was the balloon
+##   body depth vs width      deeper than wide, not flatter
+##   ground to belly          ~52% of withers height
+##   nose to rump             ~1.6x withers height
+##
+## The head is left about 15% over life size, which reads as stylised rather
+## than as a mistake.
+const WITHERS := 1.50
+const BELLY := 0.76
+
 ## Blob centres in Model space, as (x, y, z, radius).
 const SPOTS: Array[Vector4] = [
-	Vector4(-0.34, 1.34, -0.34, 0.36),
-	Vector4(0.40, 1.22, 0.10, 0.33),
-	Vector4(-0.30, 1.02, 0.52, 0.27),
-	Vector4(0.26, 1.44, -0.66, 0.24),
-	Vector4(-0.12, 1.50, 0.62, 0.26),
-	Vector4(0.34, 0.98, -0.02, 0.20),
+	Vector4(-0.24, 1.30, -0.30, 0.29),
+	Vector4(0.28, 1.16, 0.14, 0.27),
+	Vector4(-0.20, 0.98, 0.46, 0.23),
+	Vector4(0.17, 1.40, -0.56, 0.21),
+	Vector4(-0.07, 1.44, 0.54, 0.22),
+	Vector4(0.25, 0.94, -0.06, 0.17),
 ]
 
 var _noise: FastNoiseLite
@@ -92,63 +105,70 @@ func _attach(parent: Node3D, shell: Shell, mat: Material, node_name: String) -> 
 func _build_body() -> Shell:
 	var shell := Shell.new()
 
-	# Barrel. Slightly squashed so it is wider than it is tall, and arched
-	# along the spine so the withers and rump sit above the belly.
+	# Ribcage. Nearly straight topline with a slight rise over the hips, and a
+	# squash ABOVE 1 so the barrel is deeper than it is wide.
 	var spine := PackedVector3Array([
-		Vector3(0.0, 1.20, -1.06),
-		Vector3(0.0, 1.20, -0.98),
-		Vector3(0.0, 1.19, -0.84),
-		Vector3(0.0, 1.17, -0.62),
-		Vector3(0.0, 1.15, -0.32),
-		Vector3(0.0, 1.14, 0.02),
-		Vector3(0.0, 1.15, 0.34),
-		Vector3(0.0, 1.18, 0.62),
-		Vector3(0.0, 1.22, 0.86),
-		Vector3(0.0, 1.25, 1.02),
-		Vector3(0.0, 1.26, 1.09),
+		Vector3(0.0, 1.16, -0.96),
+		Vector3(0.0, 1.16, -0.90),
+		Vector3(0.0, 1.15, -0.76),
+		Vector3(0.0, 1.14, -0.52),
+		Vector3(0.0, 1.13, -0.22),
+		Vector3(0.0, 1.13, 0.10),
+		Vector3(0.0, 1.14, 0.38),
+		Vector3(0.0, 1.15, 0.62),
+		Vector3(0.0, 1.17, 0.80),
+		Vector3(0.0, 1.18, 0.90),
+		Vector3(0.0, 1.19, 0.96),
 	])
+	# Fuller through the brisket than a straight taper - a chest that narrows
+	# to a point reads as a deer. Peak width sits at 0.35, between life size
+	# (0.41 of withers height) and enough mass to still look like a cartoon.
 	var barrel := PackedFloat32Array([
-		0.05, 0.15, 0.29, 0.40, 0.455, 0.475, 0.465, 0.435, 0.36, 0.22, 0.06
+		0.05, 0.15, 0.26, 0.315, 0.34, 0.35, 0.345, 0.325, 0.27, 0.16, 0.05
 	])
 	# 80 x 76 is ~6k verts, which costs nothing and is chosen for the marking
 	# edges rather than the silhouette - below about this density the spot
 	# borders visibly step along the quad grid.
 	var body := _resample(spine, barrel, 80)
-	shell.add_tinted(_loft(body["path"], body["radii"], 0.94, 76), _hide_or_spot)
+	shell.add_tinted(_loft(body["path"], body["radii"], 1.12, 76), _hide_or_spot)
 
 	# Legs. The hoof is part of the same lofted tube, just coloured dark, which
-	# avoids the seam a separate cylinder leaves.
-	for leg in [Vector2(-0.30, -0.56), Vector2(0.30, -0.56), Vector2(-0.31, 0.62), Vector2(0.31, 0.62)]:
-		shell.add_tinted(_leg(leg.x, leg.y), _hide_or_hoof)
+	# avoids the seam a separate cylinder leaves. Hind legs carry a hock, the
+	# backward kink that stops a cow reading as a table.
+	for leg in [Vector3(-0.22, -0.56, 0.0), Vector3(0.22, -0.56, 0.0),
+			Vector3(-0.23, 0.60, 0.08), Vector3(0.23, 0.60, 0.08)]:
+		shell.add_tinted(_leg(leg.x, leg.y, leg.z), _hide_or_hoof)
 
-	shell.add(_ellipsoid(Vector3(0.0, 0.88, 0.44), Vector3(0.17, 0.13, 0.20), 8, 14), PINK)
+	shell.add(_ellipsoid(Vector3(0.0, 0.80, 0.40), Vector3(0.13, 0.11, 0.16), 8, 14), PINK)
 
 	# Tail: a tapering tube on a curve, with a dark switch on the end.
 	var tail := PackedVector3Array([
-		Vector3(0.0, 1.30, 0.98),
-		Vector3(0.0, 1.16, 1.12),
-		Vector3(0.0, 0.98, 1.18),
-		Vector3(0.0, 0.80, 1.17),
-		Vector3(0.0, 0.66, 1.14),
+		Vector3(0.0, 1.22, 0.90),
+		Vector3(0.0, 1.06, 1.02),
+		Vector3(0.0, 0.88, 1.07),
+		Vector3(0.0, 0.72, 1.07),
+		Vector3(0.0, 0.60, 1.05),
 	])
-	shell.add(_loft(tail, PackedFloat32Array([0.055, 0.042, 0.033, 0.026, 0.02]), 1.0, 10), HIDE)
-	shell.add(_ellipsoid(Vector3(0.0, 0.60, 1.13), Vector3(0.055, 0.085, 0.05), 8, 12), SPOT)
+	shell.add(_loft(tail, PackedFloat32Array([0.048, 0.036, 0.028, 0.022, 0.016]), 1.0, 10), HIDE)
+	shell.add(_ellipsoid(Vector3(0.0, 0.55, 1.04), Vector3(0.045, 0.075, 0.042), 8, 12), SPOT)
 
 	return shell
 
 
-func _leg(x: float, z: float) -> Dictionary:
+## `hock` bows the middle of the leg backwards, which is what gives a hind leg
+## its angled stance. Pass 0 for the front pair.
+func _leg(x: float, z: float, hock: float) -> Dictionary:
 	var path := PackedVector3Array([
-		Vector3(x, 0.98, z),
-		Vector3(x, 0.78, z),
-		Vector3(x, 0.54, z * 1.02),
-		Vector3(x, 0.32, z * 1.04),
-		Vector3(x, 0.17, z * 1.05),
-		Vector3(x, 0.09, z * 1.05),
-		Vector3(x, 0.03, z * 1.05),
-		Vector3(x, 0.005, z * 1.05),
+		Vector3(x, 0.95, z),
+		Vector3(x, 0.78, z + hock * 0.35),
+		Vector3(x, 0.58, z + hock),
+		Vector3(x, 0.38, z + hock * 0.75),
+		Vector3(x, 0.20, z + hock * 0.15),
+		Vector3(x, 0.10, z),
+		Vector3(x, 0.035, z),
+		Vector3(x, 0.005, z),
 	])
-	var radii := PackedFloat32Array([0.15, 0.118, 0.096, 0.083, 0.088, 0.099, 0.094, 0.05])
+	var radii := PackedFloat32Array([0.13, 0.105, 0.082, 0.068, 0.066, 0.076, 0.072, 0.04])
 	var leg := _resample(path, radii, 30)
 	return _loft(leg["path"], leg["radii"], 1.0, 18)
 
@@ -160,60 +180,63 @@ func _leg(x: float, z: float) -> Dictionary:
 func _build_head() -> Shell:
 	var shell := Shell.new()
 
+	# Starts deep inside the ribcage. If the neck base sits proud of the
+	# shoulder the silhouette gets a step at the withers, which is the single
+	# most obvious tell that a model was assembled from separate parts.
 	var neck := PackedVector3Array([
-		Vector3(0.0, 0.05, 0.26),
-		Vector3(0.0, 0.06, 0.10),
-		Vector3(0.0, 0.06, -0.08),
-		Vector3(0.0, 0.05, -0.24),
+		Vector3(0.0, 0.02, 0.32),
+		Vector3(0.0, 0.05, 0.14),
+		Vector3(0.0, 0.06, -0.04),
+		Vector3(0.0, 0.05, -0.20),
 	])
-	var throat := _resample(neck, PackedFloat32Array([0.29, 0.26, 0.235, 0.215]), 16)
-	shell.add(_loft(throat["path"], throat["radii"], 0.95, 36), HIDE)
+	var throat := _resample(neck, PackedFloat32Array([0.235, 0.212, 0.185, 0.165]), 16)
+	shell.add(_loft(throat["path"], throat["radii"], 0.98, 36), HIDE)
 
 	var skull := PackedVector3Array([
-		Vector3(0.0, 0.05, -0.22),
-		Vector3(0.0, 0.06, -0.34),
-		Vector3(0.0, 0.05, -0.48),
-		Vector3(0.0, 0.00, -0.62),
-		Vector3(0.0, -0.05, -0.74),
-		Vector3(0.0, -0.08, -0.83),
-		Vector3(0.0, -0.09, -0.89),
+		Vector3(0.0, 0.03, -0.18),
+		Vector3(0.0, 0.04, -0.28),
+		Vector3(0.0, 0.02, -0.40),
+		Vector3(0.0, -0.02, -0.52),
+		Vector3(0.0, -0.06, -0.62),
+		Vector3(0.0, -0.08, -0.70),
+		Vector3(0.0, -0.09, -0.75),
 	])
-	var skull_r := PackedFloat32Array([0.215, 0.245, 0.238, 0.205, 0.175, 0.14, 0.05])
+	var skull_r := PackedFloat32Array([0.155, 0.172, 0.163, 0.140, 0.118, 0.098, 0.035])
 	var head := _resample(skull, skull_r, 34)
-	shell.add_tinted(_loft(head["path"], head["radii"], 0.94, 40), func(v: Vector3) -> Color:
-		return PINK if v.z < -0.66 else HIDE)
+	shell.add_tinted(_loft(head["path"], head["radii"], 0.98, 40), func(v: Vector3) -> Color:
+		return PINK if v.z < -0.56 else HIDE)
 
 	# Nostrils, as two small dark dimples on the muzzle.
-	shell.add(_ellipsoid(Vector3(-0.07, -0.07, -0.855), Vector3(0.028, 0.022, 0.03), 6, 10), SPOT)
-	shell.add(_ellipsoid(Vector3(0.07, -0.07, -0.855), Vector3(0.028, 0.022, 0.03), 6, 10), SPOT)
+	shell.add(_ellipsoid(Vector3(-0.05, -0.085, -0.725), Vector3(0.022, 0.018, 0.024), 6, 10), SPOT)
+	shell.add(_ellipsoid(Vector3(0.05, -0.085, -0.725), Vector3(0.022, 0.018, 0.024), 6, 10), SPOT)
 
 	for s in [-1.0, 1.0]:
-		shell.add(_ellipsoid(Vector3(s * 0.175, 0.10, -0.50), Vector3(0.066, 0.07, 0.06), 8, 14), EYE)
-		shell.add(_ellipsoid(Vector3(s * 0.196, 0.128, -0.545), Vector3(0.024, 0.024, 0.024), 6, 10), GLINT)
+		shell.add(_ellipsoid(Vector3(s * 0.135, 0.075, -0.40), Vector3(0.048, 0.05, 0.044), 8, 14), EYE)
+		shell.add(_ellipsoid(Vector3(s * 0.152, 0.095, -0.435), Vector3(0.018, 0.018, 0.018), 6, 10), GLINT)
 		shell.add(_ear(s), HIDE)
 		shell.add(_horn(s), HORN)
 
 	# A patch over one eye. Reads as markings rather than as a painted-on decal.
-	shell.add_tinted(_ellipsoid(Vector3(-0.15, 0.13, -0.42), Vector3(0.20, 0.17, 0.16), 10, 16),
+	shell.add_tinted(_ellipsoid(Vector3(-0.11, 0.10, -0.33), Vector3(0.15, 0.13, 0.13), 10, 16),
 		func(_v: Vector3) -> Color: return SPOT)
 
 	return shell
 
 
 func _ear(side: float) -> Dictionary:
-	var part := _ellipsoid(Vector3.ZERO, Vector3(0.165, 0.038, 0.10), 10, 18)
+	var part := _ellipsoid(Vector3.ZERO, Vector3(0.135, 0.030, 0.078), 10, 18)
 	var basis := Basis(Vector3.FORWARD, side * -0.45) * Basis(Vector3.UP, side * -0.35)
-	return _apply(part, Transform3D(basis, Vector3(side * 0.245, 0.10, -0.34)))
+	return _apply(part, Transform3D(basis, Vector3(side * 0.165, 0.065, -0.27)))
 
 
 func _horn(side: float) -> Dictionary:
 	var path := PackedVector3Array([
-		Vector3(side * 0.10, 0.19, -0.40),
-		Vector3(side * 0.15, 0.27, -0.41),
-		Vector3(side * 0.205, 0.325, -0.425),
-		Vector3(side * 0.245, 0.35, -0.44),
+		Vector3(side * 0.075, 0.135, -0.31),
+		Vector3(side * 0.115, 0.200, -0.32),
+		Vector3(side * 0.150, 0.245, -0.335),
+		Vector3(side * 0.175, 0.265, -0.345),
 	])
-	return _loft(path, PackedFloat32Array([0.052, 0.040, 0.026, 0.010]), 1.0, 10)
+	return _loft(path, PackedFloat32Array([0.040, 0.030, 0.019, 0.008]), 1.0, 10)
 
 
 # ------------------------------------------------------------------ painting
