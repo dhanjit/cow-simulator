@@ -20,7 +20,11 @@ class_name CameraRig
 ## Layer 1 is terrain. The cow is on layer 2 and is excluded explicitly.
 @export_flags_3d_physics var collision_mask: int = 1
 ## Minimum gap between the camera and the ground beneath it.
-@export var ground_clearance: float = 0.7
+@export var ground_clearance: float = 0.5
+## Hard ceiling on how far the camera may rise above the focus, as a fraction
+## of its distance. Caps the look-down angle so terrain can never wrench the
+## view into a top-down map view; slight ground clipping is the better trade.
+@export var max_rise_ratio: float = 0.62
 
 ## Optional. When set, the camera is clamped against the terrain heightfield
 ## as well as the raycast - the ray only catches what is between focus and
@@ -79,19 +83,35 @@ func _process(delta: float) -> void:
 func _apply() -> void:
 	# pitch = 0 sits level behind the target; negative pitch lifts the camera.
 	var dir := Vector3(0.0, 0.0, 1.0).rotated(Vector3.RIGHT, _pitch).rotated(Vector3.UP, _yaw)
-	var wanted := _focus + dir * distance
+	var d := distance
 
 	var space := get_world_3d().direct_space_state
-	var query := PhysicsRayQueryParameters3D.create(_focus, wanted)
+	var query := PhysicsRayQueryParameters3D.create(_focus, _focus + dir * d)
 	query.collision_mask = collision_mask
 	if _target is CollisionObject3D:
 		query.exclude = [(_target as CollisionObject3D).get_rid()]
 	var hit := space.intersect_ray(query)
 	if not hit.is_empty():
-		wanted = (hit["position"] as Vector3) + (hit["normal"] as Vector3) * 0.35
+		d = minf(d, _focus.distance_to(hit["position"] as Vector3) - 0.35)
 
+	# Ground clearance. Pull the camera IN before lifting it: climbing a rise
+	# behind the cow swings the view toward top-down, which is the wrong answer
+	# in a game whose whole point is looking at the scenery. Lifting is the
+	# last resort, only once there is no distance left to give up.
+	if terrain != null:
+		var tries := 10
+		while tries > 0 and d > min_distance:
+			var probe := _focus + dir * d
+			if probe.y >= terrain.height_at(probe.x, probe.z) + ground_clearance:
+				break
+			d -= 0.55
+			tries -= 1
+
+	d = maxf(d, min_distance)
+	var wanted := _focus + dir * d
 	if terrain != null:
 		wanted.y = maxf(wanted.y, terrain.height_at(wanted.x, wanted.z) + ground_clearance)
+		wanted.y = minf(wanted.y, _focus.y + d * max_rise_ratio)
 
 	camera.global_position = wanted
 	if wanted.distance_squared_to(_focus) > 0.0025:

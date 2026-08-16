@@ -3,6 +3,7 @@ class_name Cow
 
 signal fullness_changed(value: float, maximum: float)
 signal graze_state_changed(grazing: bool)
+signal rest_state_changed(resting: bool)
 signal mooed
 
 @export_group("Movement")
@@ -23,6 +24,7 @@ signal mooed
 
 var fullness: float = 35.0
 var is_grazing: bool = false
+var is_resting: bool = false
 
 ## Assigned by the scene root. Grass is the thing we eat; camera gives us the
 ## basis for camera-relative movement; terrain is what the hooves stand on.
@@ -85,6 +87,13 @@ func _physics_process(delta: float) -> void:
 	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var moving := input.length() > 0.15
 
+	# Bedding down is a toggle, but wanting to walk always wins - a cow that
+	# ignored the stick because it was lying down would just feel broken.
+	if Input.is_action_just_pressed("rest"):
+		_set_resting(not is_resting)
+	if moving:
+		_set_resting(false)
+
 	var wish := Vector3.ZERO
 	if moving and camera != null:
 		var b := camera.global_transform.basis
@@ -98,17 +107,18 @@ func _physics_process(delta: float) -> void:
 		Input.is_action_pressed("graze")
 		and is_on_floor()
 		and not moving
+		and not is_resting
 		and planar.length() < 1.2
 		and grass_field != null
 		and grass_field.has_grass_near(mouth_position(), graze_radius)
 	)
 	_set_grazing(wants_graze)
 
-	if wish != Vector3.ZERO and not is_grazing:
+	if wish != Vector3.ZERO and not is_grazing and not is_resting:
 		var speed := run_speed if Input.is_action_pressed("run") else walk_speed
 		planar = planar.move_toward(wish * speed, acceleration * delta)
 	else:
-		var brake := friction * (2.5 if is_grazing else 1.0)
+		var brake := friction * (2.5 if (is_grazing or is_resting) else 1.0)
 		planar = planar.move_toward(Vector3.ZERO, brake * delta)
 
 	velocity.x = planar.x
@@ -126,8 +136,8 @@ func _physics_process(delta: float) -> void:
 	_face_travel(delta, planar)
 	# Legs first: the body's height and lean are derived from where the hooves
 	# ended up, so the gait has to resolve before anything reads the body pose.
-	_gait.update(delta, planar, is_grazing)
-	_life.update(delta, is_grazing, _moo_pose > 0.0, planar.length())
+	_gait.update(delta, planar, is_grazing, is_resting)
+	_life.update(delta, is_grazing, _moo_pose > 0.0, planar.length(), is_resting)
 
 
 func _set_grazing(value: bool) -> void:
@@ -135,6 +145,13 @@ func _set_grazing(value: bool) -> void:
 		return
 	is_grazing = value
 	graze_state_changed.emit(is_grazing)
+
+
+func _set_resting(value: bool) -> void:
+	if value == is_resting:
+		return
+	is_resting = value
+	rest_state_changed.emit(is_resting)
 
 
 func _face_travel(delta: float, planar: Vector3) -> void:

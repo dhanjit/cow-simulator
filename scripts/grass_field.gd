@@ -275,11 +275,38 @@ func _build_tuft_mesh() -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 1.0
-	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
-	# Single-sided triangles would vanish when viewed from behind.
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mesh.surface_set_material(0, mat)
+	mesh.surface_set_material(0, _wind_material())
 	return mesh
+
+
+## Wind, done in the vertex shader so 27,000 tufts cost nothing to animate.
+## Sway scales with height up the blade, so the roots stay put and only the
+## tips move, and the phase is offset by each tuft's world position - otherwise
+## the whole field breathes in unison, which reads as a bug.
+func _wind_material() -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode cull_disabled;
+
+uniform float sway_strength = 0.10;
+uniform float sway_speed = 1.1;
+
+void vertex() {
+	float h = max(VERTEX.y, 0.0);
+	vec3 origin = MODEL_MATRIX[3].xyz;
+	float phase = TIME * sway_speed + origin.x * 0.32 + origin.z * 0.27;
+	float s = sin(phase) + 0.35 * sin(phase * 2.7);
+	VERTEX.x += s * sway_strength * h;
+	VERTEX.z += cos(phase * 0.85) * sway_strength * 0.55 * h;
+}
+
+void fragment() {
+	ALBEDO = COLOR.rgb;
+	ROUGHNESS = 1.0;
+	SPECULAR = 0.0;
+}
+"""
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	return mat

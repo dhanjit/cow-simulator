@@ -31,6 +31,13 @@ const PHASE_OFFSET := [0.25, 0.75, 0.0, 0.5]
 @export var body_follow: float = 12.0
 @export var lean_scale: float = 0.55
 
+@export_group("Lying down")
+## How far the barrel sinks when she beds down. Belly just clear of the grass.
+@export var rest_drop: float = 0.60
+## Hooves pull in toward the body centre by this fraction as the legs fold.
+@export var rest_tuck: float = 0.45
+@export var rest_speed: float = 1.6
+
 var _model: CowModel
 var _owner: Node3D
 var _terrain: MountainTerrain
@@ -44,6 +51,7 @@ var _cycle := 0.0
 var _body_y := 0.0
 var _pitch := 0.0
 var _roll := 0.0
+var _rest := 0.0
 var _ready_done := false
 
 
@@ -78,9 +86,11 @@ func _ground(x: float, z: float) -> float:
 	return _terrain.height_at(x, z) if _terrain != null else 0.0
 
 
-func update(delta: float, planar_velocity: Vector3, grazing: bool) -> void:
+func update(delta: float, planar_velocity: Vector3, grazing: bool, resting: bool) -> void:
 	if not _ready_done:
 		return
+
+	_rest = move_toward(_rest, 1.0 if resting else 0.0, delta * rest_speed)
 
 	var speed := planar_velocity.length()
 
@@ -89,11 +99,32 @@ func update(delta: float, planar_velocity: Vector3, grazing: bool) -> void:
 		_phase = fposmod(_phase + speed * delta / stride_length, 1.0)
 	_cycle = maxf(0.35, stride_length / maxf(speed, 0.01))
 
-	for i in 4:
-		_step_leg(i, speed, planar_velocity)
+	if _rest > 0.001:
+		_fold_legs(delta)
+	else:
+		for i in 4:
+			_step_leg(i, speed, planar_velocity)
 
 	_settle_body(delta, grazing)
 	_apply_legs()
+
+
+## Bedding down. The barrel sinks and the hooves draw in under the body; the
+## two-bone IK then folds each leg on its own, because the hip-to-hoof distance
+## has collapsed. No separate lying-down pose is authored anywhere.
+func _fold_legs(delta: float) -> void:
+	var k := 1.0 - exp(-6.0 * delta)
+	for i in 4:
+		var hip_local: Vector3 = CowModel.HIPS[i]
+		var tucked_local := Vector3(hip_local.x * (1.0 - rest_tuck), 0.0, hip_local.z * (1.0 - rest_tuck * 0.7))
+		var tucked: Vector3 = _model.global_transform * tucked_local
+		tucked.y = _ground(tucked.x, tucked.z)
+		var home := _home_of(i)
+		var want := home.lerp(tucked, _rest)
+		_foot[i] = _foot[i].lerp(want, k)
+		_anchor[i] = _foot[i]
+		_target[i] = _foot[i]
+		_planted[i] = true
 
 
 func _step_leg(i: int, speed: float, planar_velocity: Vector3) -> void:
@@ -172,6 +203,9 @@ func _settle_body(delta: float, grazing: bool) -> void:
 
 	if grazing:
 		want_y -= 0.04
+	want_y -= rest_drop * _rest
+	# Settle onto one hip, the way a lying cow actually rests.
+	want_roll += 0.10 * _rest
 
 	var k := 1.0 - exp(-body_follow * delta)
 	_body_y = lerpf(_body_y, want_y, k)

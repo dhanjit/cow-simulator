@@ -38,8 +38,8 @@ theme_override_colors/font_color = Color(1, 1, 1, 0.88)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.8)
 theme_override_constants/outline_size = 5
 theme_override_font_sizes/font_size = 15
-text = "WASD  move          Shift  run          Mouse  look
-Wheel  zoom          E  graze          M  moo          Esc  cursor"
+text = "WASD  move          Shift  run          Mouse  look          Wheel  zoom
+E  graze          C  lie down          M  moo          Esc  cursor"
 
 [node name="FullnessLabel" type="Label" parent="Root"]
 anchor_top = 1.0

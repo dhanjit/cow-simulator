@@ -6,6 +6,7 @@ extends Node3D
 
 @onready var terrain: MountainTerrain = $Terrain
 @onready var grass: GrassField = $Grass
+@onready var scenery: Scenery = $Scenery
 @onready var cow: Cow = $Cow
 @onready var rig: CameraRig = $CameraRig
 @onready var hud: Hud = $Hud
@@ -16,6 +17,7 @@ func _ready() -> void:
 
 	terrain.generate()
 	grass.populate(terrain)
+	scenery.populate(terrain)
 
 	cow.grass_field = grass
 	cow.camera = rig.camera

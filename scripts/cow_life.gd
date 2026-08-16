@@ -17,6 +17,8 @@ class_name CowLife
 ## Neck pitch targets, in degrees. Negative swings the muzzle toward the ground.
 const PITCH_GRAZE := -72.0
 const PITCH_MOO := 22.0
+## Bedded down the head is carried a little lower and more level.
+const PITCH_REST := -14.0
 ## Rotation alone cannot reach the grass: hip height minus neck length still
 ## leaves the muzzle in mid air, so the shoulder drops too.
 const GRAZE_NECK_DROP := Vector3(0.0, -0.30, -0.10)
@@ -50,11 +52,11 @@ func setup(model: CowModel, neck: Node3D) -> void:
 	_ready_done = true
 
 
-func update(delta: float, grazing: bool, mooing: bool, speed: float) -> void:
+func update(delta: float, grazing: bool, mooing: bool, speed: float, resting: bool) -> void:
 	if not _ready_done:
 		return
 	_t += delta
-	_tick_neck(delta, grazing, mooing, speed)
+	_tick_neck(delta, grazing, mooing, speed, resting)
 	_tick_tail(delta, speed)
 	_tick_ears(delta)
 	_tick_eyes(delta)
@@ -62,25 +64,27 @@ func update(delta: float, grazing: bool, mooing: bool, speed: float) -> void:
 
 # ------------------------------------------------------------------ neck/head
 
-func _tick_neck(delta: float, grazing: bool, mooing: bool, speed: float) -> void:
-	# Cud-chewing. Grazing chews constantly; a standing cow ruminates in bouts.
+func _tick_neck(delta: float, grazing: bool, mooing: bool, speed: float, resting: bool) -> void:
+	# Cud-chewing. Grazing chews constantly; a lying cow ruminates almost
+	# continuously, which is most of what a resting cow is actually doing.
 	if grazing:
 		_chew_left = 0.4
 	else:
 		_next_chew -= delta
 		if _next_chew <= 0.0 and speed < 0.4:
-			_chew_left = _rng.randf_range(2.5, 6.0)
-			_next_chew = _rng.randf_range(9.0, 20.0)
+			_chew_left = _rng.randf_range(4.0, 9.0) if resting else _rng.randf_range(2.5, 6.0)
+			_next_chew = _rng.randf_range(2.0, 5.0) if resting else _rng.randf_range(9.0, 20.0)
 	if _chew_left > 0.0:
 		_chew_left -= delta
 		_chew += delta * chew_speed
 	var chew_offset := sin(_chew) * (0.035 if _chew_left > 0.0 else 0.0)
 
-	# Idle glances. A grazing or walking cow keeps its head where it is.
+	# Idle glances. A grazing or walking cow keeps its head where it is; a
+	# resting one looks around more, since that is all there is to do.
 	_next_look -= delta
 	if _next_look <= 0.0:
-		_next_look = _rng.randf_range(4.0, 11.0)
-		_look_target = 0.0 if (grazing or speed > 0.4) else _rng.randf_range(-0.45, 0.45)
+		_next_look = _rng.randf_range(3.0, 8.0) if resting else _rng.randf_range(4.0, 11.0)
+		_look_target = 0.0 if (grazing or speed > 0.4) else _rng.randf_range(-0.5, 0.5)
 	if grazing or speed > 0.4:
 		_look_target = 0.0
 	_look = lerpf(_look, _look_target, 1.0 - exp(-2.5 * delta))
@@ -90,6 +94,8 @@ func _tick_neck(delta: float, grazing: bool, mooing: bool, speed: float) -> void
 		pitch = deg_to_rad(PITCH_GRAZE)
 	elif mooing:
 		pitch = deg_to_rad(PITCH_MOO)
+	elif resting:
+		pitch = deg_to_rad(PITCH_REST)
 	# A walking cow carries its head a little lower than a standing one.
 	pitch += -0.06 * clampf(speed / 4.0, 0.0, 1.5)
 

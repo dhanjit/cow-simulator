@@ -36,6 +36,7 @@ which takes roughly half a second and prints a line to stdout when it is done.
 | Mouse | Orbit camera |
 | Mouse wheel | Zoom |
 | `E` (hold) | Graze — only works standing still, on grass |
+| `C` | Lie down / get up |
 | `M` | Moo |
 | `Esc` | Release / recapture the mouse cursor |
 
@@ -65,6 +66,16 @@ camera is mouse-only for now.
   chews while grazing and ruminates in bouts when idle, and glances around when
   standing still. None of it is locked to the stride — anything that beats in
   time with the walk reads as machinery.
+- **Lying down** (`C`). The barrel sinks and the hooves draw in under her, and
+  the two-bone IK folds each leg on its own because the hip-to-hoof distance has
+  collapsed — there is no authored lying-down pose anywhere. She settles onto one
+  hip and ruminates almost continuously, which is what a resting cow is really
+  doing. Asking her to walk always overrides it.
+- **Scenery.** Conifers in noise-driven groves rather than an even sprinkle,
+  scree gathering toward the foothills, and flowers through the meadow — three
+  MultiMeshes, so the whole lot is three draw calls. The grass sways on a vertex
+  shader, phase-offset by each tuft's world position, because a field that
+  breathes in unison reads as a bug.
 - **The cow itself** is generated at runtime from lofted tubes — a path, a radius
   per station, a swept ring — rather than assembled from box and cylinder
   primitives. Markings are vertex colours evaluated against noise-warped blobs, so
@@ -102,6 +113,7 @@ scripts/
   cow_model.gd         builds the cow rig from lofted tubes at runtime
   cow_gait.gd          four-leg IK walk, footfall timing, body pose from feet
   cow_life.gd          tail, ears, blinking, chewing, idle glances
+  scenery.gd           trees, rocks and flowers, three MultiMeshes total
   camera_rig.gd        third-person orbit, raycast + heightfield collision
   hud.gd               HUD bindings
   moo_synth.gd         procedural moo generator

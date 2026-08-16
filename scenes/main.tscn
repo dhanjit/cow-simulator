@@ -4,6 +4,7 @@
 [ext_resource type="Script" path="res://scripts/mountain_terrain.gd" id="2_terrain"]
 [ext_resource type="Script" path="res://scripts/grass_field.gd" id="3_grass"]
 [ext_resource type="Script" path="res://scripts/camera_rig.gd" id="4_rig"]
+[ext_resource type="Script" path="res://scripts/scenery.gd" id="7_scenery"]
 [ext_resource type="PackedScene" path="res://scenes/cow.tscn" id="5_cow"]
 [ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="6_hud"]
 
@@ -55,6 +56,9 @@ script = ExtResource("2_terrain")
 
 [node name="Grass" type="MultiMeshInstance3D" parent="."]
 script = ExtResource("3_grass")
+
+[node name="Scenery" type="Node3D" parent="."]
+script = ExtResource("7_scenery")
 
 [node name="Cow" parent="." instance=ExtResource("5_cow")]
 
