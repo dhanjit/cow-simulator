@@ -50,7 +50,21 @@ camera is mouse-only for now.
   trimesh collider, the grass scatter, the spawn point and the camera's ground clamp,
   so none of them can disagree about where the ground is.
 - **Cow controller.** `CharacterBody3D` with weighty acceleration, slope handling up
-  to 57°, camera-relative steering, and a hoof-bob/sway gait that scales with speed.
+  to 57°, and camera-relative steering.
+- **The legs actually walk.** Four two-bone IK chains on a lateral-sequence
+  footfall — the order a real cow uses, back-left leading — with a 0.66 duty
+  factor. The cycle advances by *distance travelled*, not by time, which is what
+  stops the hooves ice-skating: if the body hasn't moved, the cycle hasn't
+  advanced. A planted hoof is pinned to the exact world position it landed on
+  until it lifts, and body height, pitch and roll are derived from where the
+  four hooves ended up rather than from a sine wave. Standing still, a hoof that
+  drifts too far from under its hip steps back on its own, so turning on the
+  spot is a shuffle rather than a pivot on locked feet.
+- **Cow things.** Tail sways and occasionally flicks, with phase lag down the
+  joints so it whips instead of sweeping rigidly. Ears twitch. She blinks. She
+  chews while grazing and ruminates in bouts when idle, and glances around when
+  standing still. None of it is locked to the stride — anything that beats in
+  time with the walk reads as machinery.
 - **The cow itself** is generated at runtime from lofted tubes — a path, a radius
   per station, a swept ring — rather than assembled from box and cylinder
   primitives. Markings are vertex colours evaluated against noise-warped blobs, so
@@ -85,7 +99,9 @@ scripts/
   mountain_terrain.gd  height function, mesh + collider generation, spawn search
   grass_field.gd       MultiMesh tufts, spatial-hash grazing queries, regrowth
   cow.gd               movement, grazing, fullness, moo
-  cow_model.gd         builds the cow mesh from lofted tubes at runtime
+  cow_model.gd         builds the cow rig from lofted tubes at runtime
+  cow_gait.gd          four-leg IK walk, footfall timing, body pose from feet
+  cow_life.gd          tail, ears, blinking, chewing, idle glances
   camera_rig.gd        third-person orbit, raycast + heightfield collision
   hud.gd               HUD bindings
   moo_synth.gd         procedural moo generator

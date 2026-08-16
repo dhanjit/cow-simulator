@@ -20,6 +20,9 @@ func _ready() -> void:
 	cow.grass_field = grass
 	cow.camera = rig.camera
 	cow.global_position = terrain.spawn_point()
+	# The gait reads hip positions off the model's global transform, so the cow
+	# has to be standing in its final spot before the rig is initialised.
+	cow.begin(terrain)
 	rig.terrain = terrain
 	rig.set_target(cow)
 

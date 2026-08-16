@@ -1,24 +1,30 @@
 extends Node3D
 class_name CowModel
 
-## Builds the cow's visual mesh at runtime.
+## Builds the cow's visual rig at runtime.
 ##
-## The first pass used BoxMesh + CylinderMesh primitives and read as a crate on
-## sticks, with the spots as flat plates hovering off the flanks. Everything
-## here is lofted instead: a path, a radius per station, and a ring of vertices
-## swept along it. That gives smooth normals and a continuous silhouette, which
-## is the whole difference between "stylised" and "bad".
+## Everything is lofted - a path, a radius per station, a ring of vertices swept
+## along it - rather than assembled from box and cylinder primitives, which is
+## what made the first version read as a crate on sticks.
 ##
-## Two meshes are produced: the body group (parented here) and the head group
-## (parented to Neck, so cow.gd can pitch the head down to graze). Spots are
-## vertex colours evaluated against noise-warped blobs on the body surface, so
-## they wrap the form instead of sitting on top of it.
+## The legs are deliberately NOT part of the body mesh. Each is two separate
+## segments with its origin at the joint, so cow_gait.gd can drive them with
+## inverse kinematics. Same for the tail joints, the ears and the eyes: anything
+## that needs to move independently is its own node.
 ##
-## Winding convention: every shell below is generated so that
+## Proportions are keyed to a real Holstein, scaled so the withers land at 1.50
+## and the belly at 0.76 (metres, hooves at y = 0):
+##
+##   width / withers height   0.41   - a cow is NARROW
+##   body depth vs width      deeper than wide, not flatter
+##   ground to belly          ~52% of withers height
+##
+## The head is left about 15% over life size, which reads as stylised.
+##
+## Winding convention: every shell is generated so that
 ## cross(p1 - p0, p2 - p0) points OUTWARD. Normals are accumulated from that,
 ## then the index order is reversed once at the end, because Godot treats the
-## opposite winding as front-facing. Getting this backwards is what made the
-## terrain collider's floor normals point down on day one.
+## opposite winding as front-facing.
 
 const HIDE := Color(0.95, 0.93, 0.89)
 const SPOT := Color(0.13, 0.11, 0.11)
@@ -28,18 +34,20 @@ const HORN := Color(0.85, 0.79, 0.66)
 const EYE := Color(0.05, 0.04, 0.04)
 const GLINT := Color(1.0, 1.0, 1.0)
 
-## Proportions are keyed to a real Holstein, scaled so the withers land at
-## 1.50 and the belly at 0.76 (metres, hooves at y = 0):
-##
-##   width / withers height   0.41   - a cow is NARROW; this was the balloon
-##   body depth vs width      deeper than wide, not flatter
-##   ground to belly          ~52% of withers height
-##   nose to rump             ~1.6x withers height
-##
-## The head is left about 15% over life size, which reads as stylised rather
-## than as a mistake.
-const WITHERS := 1.50
-const BELLY := 0.76
+## Leg order used everywhere: front-left, front-right, back-left, back-right.
+enum { FL, FR, BL, BR }
+
+const HIP_HEIGHT := 0.95
+const UPPER_LEN := 0.55
+const LOWER_LEN := 0.50
+
+## Hip sockets in Model space.
+const HIPS: Array[Vector3] = [
+	Vector3(-0.22, HIP_HEIGHT, -0.56),
+	Vector3(0.22, HIP_HEIGHT, -0.56),
+	Vector3(-0.23, HIP_HEIGHT, 0.60),
+	Vector3(0.23, HIP_HEIGHT, 0.60),
+]
 
 ## Blob centres in Model space, as (x, y, z, radius).
 const SPOTS: Array[Vector4] = [
@@ -51,7 +59,20 @@ const SPOTS: Array[Vector4] = [
 	Vector4(0.25, 0.94, -0.06, 0.17),
 ]
 
+const TAIL_SEGMENTS := 4
+const TAIL_SEG_LEN := 0.15
+
+var leg_upper: Array[MeshInstance3D] = []
+var leg_lower: Array[MeshInstance3D] = []
+## A blob parked at each knee. Two lofted tubes meeting at an angle leave a
+## visible notch; a joint mass is the cheapest way to hide it.
+var leg_knee: Array[MeshInstance3D] = []
+var tail_joints: Array[Node3D] = []
+var ear_pivots: Array[Node3D] = []
+var eyes: Array[MeshInstance3D] = []
+
 var _noise: FastNoiseLite
+var _material: StandardMaterial3D
 
 
 ## Accumulates several shells into one mesh.
@@ -61,12 +82,9 @@ class Shell:
 	var colors := PackedColorArray()
 
 	func add(part: Dictionary, color: Color) -> void:
-		_add_tinted(part, func(_v: Vector3) -> Color: return color)
+		add_tinted(part, func(_v: Vector3) -> Color: return color)
 
 	func add_tinted(part: Dictionary, tint: Callable) -> void:
-		_add_tinted(part, tint)
-
-	func _add_tinted(part: Dictionary, tint: Callable) -> void:
 		var base := verts.size()
 		var pv: PackedVector3Array = part["verts"]
 		var pi: PackedInt32Array = part["indices"]
@@ -83,26 +101,28 @@ func _ready() -> void:
 	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	_noise.frequency = 1.6
 
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 0.72
-	mat.metallic = 0.0
+	_material = StandardMaterial3D.new()
+	_material.vertex_color_use_as_albedo = true
+	_material.roughness = 0.72
+	_material.metallic = 0.0
 
-	var neck: Node3D = $Neck
-	_attach(self, _build_body(), mat, "BodyMesh")
-	_attach(neck, _build_head(), mat, "HeadMesh")
+	_build_torso()
+	_build_legs()
+	_build_tail()
+	_build_head()
 
 
-func _attach(parent: Node3D, shell: Shell, mat: Material, node_name: String) -> void:
+func _attach(parent: Node3D, shell: Shell, node_name: String) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.name = node_name
-	mi.mesh = _finish(shell, mat)
+	mi.mesh = _finish(shell)
 	parent.add_child(mi)
+	return mi
 
 
-# ---------------------------------------------------------------- body group
+# ---------------------------------------------------------------------- torso
 
-func _build_body() -> Shell:
+func _build_torso() -> void:
 	var shell := Shell.new()
 
 	# Ribcage. Nearly straight topline with a slight rise over the hips, and a
@@ -121,68 +141,117 @@ func _build_body() -> Shell:
 		Vector3(0.0, 1.19, 0.96),
 	])
 	# Fuller through the brisket than a straight taper - a chest that narrows
-	# to a point reads as a deer. Peak width sits at 0.35, between life size
-	# (0.41 of withers height) and enough mass to still look like a cartoon.
+	# to a point reads as a deer.
 	var barrel := PackedFloat32Array([
 		0.05, 0.15, 0.26, 0.315, 0.34, 0.35, 0.345, 0.325, 0.27, 0.16, 0.05
 	])
-	# 80 x 76 is ~6k verts, which costs nothing and is chosen for the marking
-	# edges rather than the silhouette - below about this density the spot
-	# borders visibly step along the quad grid.
+	# 80 x 76 is ~6k verts, chosen for the marking edges rather than the
+	# silhouette - below about this density the spot borders step visibly.
 	var body := _resample(spine, barrel, 80)
 	shell.add_tinted(_loft(body["path"], body["radii"], 1.12, 76), _hide_or_spot)
 
-	# Legs. The hoof is part of the same lofted tube, just coloured dark, which
-	# avoids the seam a separate cylinder leaves. Hind legs carry a hock, the
-	# backward kink that stops a cow reading as a table.
-	for leg in [Vector3(-0.22, -0.56, 0.0), Vector3(0.22, -0.56, 0.0),
-			Vector3(-0.23, 0.60, 0.08), Vector3(0.23, 0.60, 0.08)]:
-		shell.add_tinted(_leg(leg.x, leg.y, leg.z), _hide_or_hoof)
+	# Shoulder and haunch masses, so the legs emerge from muscle rather than
+	# poking straight out of a tube.
+	for i in HIPS.size():
+		var h: Vector3 = HIPS[i]
+		shell.add_tinted(_ellipsoid(Vector3(h.x * 0.72, h.y + 0.05, h.z), Vector3(0.16, 0.21, 0.24), 10, 16),
+			_hide_or_spot)
 
 	shell.add(_ellipsoid(Vector3(0.0, 0.80, 0.40), Vector3(0.13, 0.11, 0.16), 8, 14), PINK)
 
-	# Tail: a tapering tube on a curve, with a dark switch on the end.
-	var tail := PackedVector3Array([
-		Vector3(0.0, 1.22, 0.90),
-		Vector3(0.0, 1.06, 1.02),
-		Vector3(0.0, 0.88, 1.07),
-		Vector3(0.0, 0.72, 1.07),
-		Vector3(0.0, 0.60, 1.05),
-	])
-	shell.add(_loft(tail, PackedFloat32Array([0.048, 0.036, 0.028, 0.022, 0.016]), 1.0, 10), HIDE)
-	shell.add(_ellipsoid(Vector3(0.0, 0.55, 1.04), Vector3(0.045, 0.075, 0.042), 8, 12), SPOT)
-
-	return shell
+	_attach(self, shell, "Torso")
 
 
-## `hock` bows the middle of the leg backwards, which is what gives a hind leg
-## its angled stance. Pass 0 for the front pair.
-func _leg(x: float, z: float, hock: float) -> Dictionary:
+# ----------------------------------------------------------------------- legs
+
+func _build_legs() -> void:
+	leg_upper.clear()
+	leg_lower.clear()
+	leg_knee.clear()
+
+	for i in HIPS.size():
+		var upper := Shell.new()
+		upper.add(_segment(UPPER_LEN, 0.165, 0.105), HIDE)
+		leg_upper.append(_attach(self, upper, "LegUpper%d" % i))
+
+		var knee := Shell.new()
+		knee.add(_ellipsoid(Vector3.ZERO, Vector3(0.098, 0.098, 0.098), 8, 14), HIDE)
+		leg_knee.append(_attach(self, knee, "LegKnee%d" % i))
+
+		var lower := Shell.new()
+		# Hoof is part of the same lofted tube, just coloured dark, which avoids
+		# the seam a separate cylinder leaves.
+		lower.add_tinted(_lower_leg(LOWER_LEN), func(v: Vector3) -> Color:
+			return HOOF if v.y < -(LOWER_LEN - 0.11) else HIDE)
+		leg_lower.append(_attach(self, lower, "LegLower%d" % i))
+
+
+## A tapered tube running from the origin down its own -Y axis. Building each
+## segment in its own local space is what lets the gait aim it by transform.
+func _segment(length: float, r_top: float, r_bottom: float) -> Dictionary:
 	var path := PackedVector3Array([
-		Vector3(x, 0.95, z),
-		Vector3(x, 0.78, z + hock * 0.35),
-		Vector3(x, 0.58, z + hock),
-		Vector3(x, 0.38, z + hock * 0.75),
-		Vector3(x, 0.20, z + hock * 0.15),
-		Vector3(x, 0.10, z),
-		Vector3(x, 0.035, z),
-		Vector3(x, 0.005, z),
+		Vector3.ZERO,
+		Vector3(0.0, -length * 0.35, 0.0),
+		Vector3(0.0, -length * 0.7, 0.0),
+		Vector3(0.0, -length, 0.0),
 	])
-	var radii := PackedFloat32Array([0.13, 0.105, 0.082, 0.068, 0.066, 0.076, 0.072, 0.04])
-	var leg := _resample(path, radii, 30)
-	return _loft(leg["path"], leg["radii"], 1.0, 18)
+	var radii := PackedFloat32Array([r_top, lerpf(r_top, r_bottom, 0.4), lerpf(r_top, r_bottom, 0.78), r_bottom])
+	var seg := _resample(path, radii, 16)
+	return _loft(seg["path"], seg["radii"], 1.0, 16)
 
 
-# ---------------------------------------------------------------- head group
-# Local to the Neck pivot, which sits inside the shoulders so the neck does not
-# tear away from the body when cow.gd pitches it down to graze.
+func _lower_leg(length: float) -> Dictionary:
+	var path := PackedVector3Array([
+		Vector3.ZERO,
+		Vector3(0.0, -length * 0.42, 0.0),
+		Vector3(0.0, -length * 0.74, 0.0),
+		Vector3(0.0, -(length - 0.075), 0.0),
+		Vector3(0.0, -(length - 0.03), 0.0),
+		Vector3(0.0, -length, 0.0),
+	])
+	var radii := PackedFloat32Array([0.098, 0.080, 0.072, 0.082, 0.088, 0.050])
+	var seg := _resample(path, radii, 26)
+	return _loft(seg["path"], seg["radii"], 1.0, 16)
 
-func _build_head() -> Shell:
+
+# ----------------------------------------------------------------------- tail
+
+func _build_tail() -> void:
+	tail_joints.clear()
+	var parent: Node3D = self
+	for i in TAIL_SEGMENTS:
+		var joint := Node3D.new()
+		joint.name = "TailJoint%d" % i
+		if i == 0:
+			# Base at the rump, angled back and down.
+			joint.transform = Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-28.0)), Vector3(0.0, 1.20, 0.92))
+		else:
+			joint.position = Vector3(0.0, -TAIL_SEG_LEN, 0.0)
+		parent.add_child(joint)
+
+		var shell := Shell.new()
+		var r_top := lerpf(0.048, 0.020, float(i) / float(TAIL_SEGMENTS))
+		var r_bot := lerpf(0.048, 0.020, float(i + 1) / float(TAIL_SEGMENTS))
+		shell.add(_segment(TAIL_SEG_LEN, r_top, r_bot), HIDE)
+		if i == TAIL_SEGMENTS - 1:
+			shell.add(_ellipsoid(Vector3(0.0, -TAIL_SEG_LEN - 0.04, 0.0), Vector3(0.045, 0.075, 0.042), 8, 12), SPOT)
+		_attach(joint, shell, "TailMesh%d" % i)
+
+		tail_joints.append(joint)
+		parent = joint
+
+
+# ----------------------------------------------------------------------- head
+# Built under the Neck pivot, which sits inside the shoulders so the neck does
+# not tear away from the body when the head pitches down to graze.
+
+func _build_head() -> void:
+	var neck_node: Node3D = $Neck
 	var shell := Shell.new()
 
-	# Starts deep inside the ribcage. If the neck base sits proud of the
-	# shoulder the silhouette gets a step at the withers, which is the single
-	# most obvious tell that a model was assembled from separate parts.
+	# Starts deep inside the ribcage. A neck base sitting proud of the shoulder
+	# puts a step in the topline, which is the clearest sign a model was
+	# assembled from separate parts.
 	var neck := PackedVector3Array([
 		Vector3(0.0, 0.02, 0.32),
 		Vector3(0.0, 0.05, 0.14),
@@ -206,27 +275,39 @@ func _build_head() -> Shell:
 	shell.add_tinted(_loft(head["path"], head["radii"], 0.98, 40), func(v: Vector3) -> Color:
 		return PINK if v.z < -0.56 else HIDE)
 
-	# Nostrils, as two small dark dimples on the muzzle.
 	shell.add(_ellipsoid(Vector3(-0.05, -0.085, -0.725), Vector3(0.022, 0.018, 0.024), 6, 10), SPOT)
 	shell.add(_ellipsoid(Vector3(0.05, -0.085, -0.725), Vector3(0.022, 0.018, 0.024), 6, 10), SPOT)
 
 	for s in [-1.0, 1.0]:
-		shell.add(_ellipsoid(Vector3(s * 0.135, 0.075, -0.40), Vector3(0.048, 0.05, 0.044), 8, 14), EYE)
-		shell.add(_ellipsoid(Vector3(s * 0.152, 0.095, -0.435), Vector3(0.018, 0.018, 0.018), 6, 10), GLINT)
-		shell.add(_ear(s), HIDE)
 		shell.add(_horn(s), HORN)
 
 	# A patch over one eye. Reads as markings rather than as a painted-on decal.
-	shell.add_tinted(_ellipsoid(Vector3(-0.11, 0.10, -0.33), Vector3(0.15, 0.13, 0.13), 10, 16),
-		func(_v: Vector3) -> Color: return SPOT)
+	shell.add(_ellipsoid(Vector3(-0.11, 0.10, -0.33), Vector3(0.15, 0.13, 0.13), 10, 16), SPOT)
 
-	return shell
+	_attach(neck_node, shell, "Head")
 
+	# Eyes and ears are separate nodes so they can blink and flick.
+	eyes.clear()
+	ear_pivots.clear()
+	for s in [-1.0, 1.0]:
+		var eye_shell := Shell.new()
+		eye_shell.add(_ellipsoid(Vector3.ZERO, Vector3(0.048, 0.05, 0.044), 8, 14), EYE)
+		eye_shell.add(_ellipsoid(Vector3(s * 0.017, 0.02, -0.035), Vector3(0.018, 0.018, 0.018), 6, 10), GLINT)
+		var eye := _attach(neck_node, eye_shell, "Eye%d" % eyes.size())
+		eye.position = Vector3(s * 0.135, 0.075, -0.40)
+		eyes.append(eye)
 
-func _ear(side: float) -> Dictionary:
-	var part := _ellipsoid(Vector3.ZERO, Vector3(0.135, 0.030, 0.078), 10, 18)
-	var basis := Basis(Vector3.FORWARD, side * -0.45) * Basis(Vector3.UP, side * -0.35)
-	return _apply(part, Transform3D(basis, Vector3(side * 0.165, 0.065, -0.27)))
+		var pivot := Node3D.new()
+		pivot.name = "EarPivot%d" % ear_pivots.size()
+		pivot.transform = Transform3D(
+			Basis(Vector3.FORWARD, s * -0.45) * Basis(Vector3.UP, s * -0.35),
+			Vector3(s * 0.165, 0.065, -0.27)
+		)
+		neck_node.add_child(pivot)
+		var ear_shell := Shell.new()
+		ear_shell.add(_ellipsoid(Vector3(s * 0.075, 0.0, 0.0), Vector3(0.135, 0.030, 0.078), 10, 18), HIDE)
+		_attach(pivot, ear_shell, "EarMesh")
+		ear_pivots.append(pivot)
 
 
 func _horn(side: float) -> Dictionary:
@@ -246,22 +327,16 @@ func _hide_or_spot(v: Vector3) -> Color:
 	# separates "cow" from "polka dots".
 	var wobble := _noise.get_noise_3d(v.x * 3.2, v.y * 3.2, v.z * 3.2) * 0.11
 	for s in SPOTS:
-		var d := Vector3(s.x, s.y, s.z).distance_to(v)
-		if d + wobble < s.w:
+		if Vector3(s.x, s.y, s.z).distance_to(v) + wobble < s.w:
 			return SPOT
 	return HIDE
-
-
-func _hide_or_hoof(v: Vector3) -> Color:
-	return HOOF if v.y < 0.14 else HIDE
 
 
 # ------------------------------------------------------------ mesh machinery
 
 ## Catmull-Rom resample of a control path and its radii. Density matters for
-## more than smoothness here: the markings are vertex colours, so the width of
-## the blur between a spot vertex and a hide vertex is the vertex spacing. Too
-## few stations and the spots read as grey smudges instead of patches.
+## more than smoothness: the markings are vertex colours, so the width of the
+## blur between a spot vertex and a hide vertex is the vertex spacing.
 func _resample(path: PackedVector3Array, radii: PackedFloat32Array, count: int) -> Dictionary:
 	var n := path.size()
 	var out_path := PackedVector3Array()
@@ -373,14 +448,7 @@ func _ellipsoid(center: Vector3, radius: Vector3, rings: int, segments: int) -> 
 	return {"verts": verts, "indices": indices}
 
 
-func _apply(part: Dictionary, xform: Transform3D) -> Dictionary:
-	var out := PackedVector3Array()
-	for v in part["verts"] as PackedVector3Array:
-		out.append(xform * v)
-	return {"verts": out, "indices": part["indices"]}
-
-
-func _finish(shell: Shell, mat: Material) -> ArrayMesh:
+func _finish(shell: Shell) -> ArrayMesh:
 	var verts := shell.verts
 	var indices := shell.indices
 
@@ -423,5 +491,5 @@ func _finish(shell: Shell, mat: Material) -> ArrayMesh:
 
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	mesh.surface_set_material(0, mat)
+	mesh.surface_set_material(0, _material)
 	return mesh
