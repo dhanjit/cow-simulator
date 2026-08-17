@@ -52,7 +52,19 @@ camera is mouse-only for now.
   so none of them can disagree about where the ground is.
 - **Cow controller.** `CharacterBody3D` with weighty acceleration, slope handling up
   to 57°, and camera-relative steering.
-- **The legs actually walk.** Four two-bone IK chains on a lateral-sequence
+- **Playback synced to ground speed, not wall-clock.** A canned walk cycle
+  played at a fixed rate skates. The clip rate is scaled by actual velocity, the
+  same distance-driven principle the procedural gait uses.
+- **Body tilted to the terrain normal.** Grass hides hoof contact; it does not
+  hide a level body on a slope, so the cow noses downhill and banks across a
+  contour.
+- **Lying down** (`C`) is posed, not animated — no animal in the pack has a
+  resting clip. Legs fold from the standing pose and the neck lifts to keep the
+  head up, because a cow with her nose in the grass reads as a sick one.
+
+Behind the `use_asset_cow` flag, the procedural cow still has:
+
+- **Legs that walk from IK.** Four two-bone chains on a lateral-sequence
   footfall — the order a real cow uses, back-left leading — with a 0.66 duty
   factor. The cycle advances by *distance travelled*, not by time, which is what
   stops the hooves ice-skating: if the body hasn't moved, the cycle hasn't
@@ -76,11 +88,17 @@ camera is mouse-only for now.
   MultiMeshes, so the whole lot is three draw calls. The grass sways on a vertex
   shader, phase-offset by each tuft's world position, because a field that
   breathes in unison reads as a bug.
-- **The cow itself** is generated at runtime from lofted tubes — a path, a radius
-  per station, a swept ring — rather than assembled from box and cylinder
-  primitives. Markings are vertex colours evaluated against noise-warped blobs, so
-  they wrap the body instead of sitting on it as flat plates. Stylised is fine;
-  a crate on sticks is not.
+- **The cow** is Quaternius' CC0 rigged model, repainted at runtime into a
+  Holstein by a shader that stamps noise-warped patches in object space. It
+  ships seven flat colour materials and no textures, which is exactly why it
+  sits well against flat-shaded terrain — and why it repaints freely. Walking,
+  galloping, idling and grazing are its hand-authored clips. See
+  [assets/vendor/NOTICE.md](assets/vendor/NOTICE.md).
+- **A second, procedural cow** is still in the repo — mesh, four-leg IK gait and
+  idle behaviour, all generated in GDScript. Flip `use_asset_cow` on the Cow
+  node to switch. It was written before the asset was found; it is kept because
+  its terrain-adaptive foot planting is genuinely better, and because comparing
+  them in motion is more useful than comparing screenshots.
 - **Grazing.** Hold `E` and the head drops. Individual tufts within reach are chewed
   shorter and disappear; the fullness meter fills by exactly what was consumed. A
   patch runs out in about a second, so the loop is *stop, eat, move on* rather than

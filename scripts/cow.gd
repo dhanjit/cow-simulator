@@ -14,6 +14,11 @@ signal mooed
 @export var turn_speed: float = 8.0
 @export var gravity: float = 26.0
 
+## Which cow you get. true = the Quaternius CC0 rigged asset with hand-authored
+## clips; false = the procedural cow in cow_model.gd + cow_gait.gd + cow_life.gd.
+## Both are kept so they can be compared in motion rather than in stills.
+@export var use_asset_cow: bool = true
+
 @export_group("Grazing")
 @export var graze_radius: float = 1.3
 ## Tuft height chewed off per second.
@@ -40,6 +45,7 @@ var _life := CowLife.new()
 
 @onready var _model: CowModel = $Model
 @onready var _neck: Node3D = $Model/Neck
+@onready var _rig: CowRig = $Rig
 @onready var _moo_player: AudioStreamPlayer3D = $MooPlayer
 @onready var _moo_ring: MeshInstance3D = $MooRing
 
@@ -55,14 +61,25 @@ func _ready() -> void:
 ## Called by the scene root once the terrain exists and the cow has been placed.
 func begin(terrain_ref: MountainTerrain) -> void:
 	terrain = terrain_ref
-	_gait.setup(_model, self, terrain)
-	_life.setup(_model, _neck)
+	_model.visible = not use_asset_cow
+	_rig.visible = use_asset_cow
+	if use_asset_cow:
+		_rig.setup(terrain)
+	else:
+		_gait.setup(_model, self, terrain)
+		_life.setup(_model, _neck)
 
 
-## Where the mouth is: under the muzzle, at ground level. Kept in sync with how
-## far the head reaches in cow_model.gd.
+## Where the mouth is: under the muzzle, at ground level. Read from whichever
+## body is actually visible - the procedural model's yaw is left untouched in
+## asset mode, so using it there would aim the graze query at the wrong patch.
 func mouth_position() -> Vector3:
-	return global_position - _model.global_transform.basis.z * 1.35
+	var source: Node3D = _rig if use_asset_cow else _model
+	var forward := -source.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length_squared() < 1e-6:
+		forward = Vector3.FORWARD
+	return global_position + forward.normalized() * 1.35
 
 
 ## True when standing still on grass - drives the HUD prompt.
@@ -133,11 +150,16 @@ func _physics_process(delta: float) -> void:
 	fullness = maxf(0.0, fullness - hunger_per_second * delta)
 	fullness_changed.emit(fullness, max_fullness)
 
-	_face_travel(delta, planar)
-	# Legs first: the body's height and lean are derived from where the hooves
-	# ended up, so the gait has to resolve before anything reads the body pose.
-	_gait.update(delta, planar, is_grazing, is_resting)
-	_life.update(delta, is_grazing, _moo_pose > 0.0, planar.length(), is_resting)
+	if use_asset_cow:
+		# The rig owns its own facing, since it also owns the terrain lean and
+		# the two have to be composed into one basis.
+		_rig.update(delta, planar, is_grazing, is_resting, _moo_pose > 0.0)
+	else:
+		_face_travel(delta, planar)
+		# Legs first: the body's height and lean are derived from where the
+		# hooves ended up, so the gait resolves before anything reads the pose.
+		_gait.update(delta, planar, is_grazing, is_resting)
+		_life.update(delta, is_grazing, _moo_pose > 0.0, planar.length(), is_resting)
 
 
 func _set_grazing(value: bool) -> void:

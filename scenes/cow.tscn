@@ -1,7 +1,8 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/cow.gd" id="1_cow"]
 [ext_resource type="Script" path="res://scripts/cow_model.gd" id="2_model"]
+[ext_resource type="Script" path="res://scripts/cow_rig.gd" id="3_rig"]
 
 [sub_resource type="CapsuleShape3D" id="shape_body"]
 radius = 0.42
@@ -36,6 +37,9 @@ script = ExtResource("2_model")
 
 [node name="Neck" type="Node3D" parent="Model"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, -0.62)
+
+[node name="Rig" type="Node3D" parent="."]
+script = ExtResource("3_rig")
 
 [node name="MooPlayer" type="AudioStreamPlayer3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.24, -1.3)
